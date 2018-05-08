@@ -1,0 +1,15 @@
+{
+  "presets": [
+    ["env", {
+      "targets": {
+        "node": "current"
+      }
+    }],
+    "flow"
+  ],
+  "plugins": [
+    "transform-object-rest-spread",
+    "syntax-async-functions",
+    "transform-runtime"
+  ]
+}

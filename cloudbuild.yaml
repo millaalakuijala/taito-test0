@@ -1,0 +1,200 @@
+# NOTE: This file has been generated from server-template by taito-cli.
+# It is located here only to avoid accidental build breaks. Keep modifications 
+# minimal and improve the original instead.
+
+images: [
+  'eu.gcr.io/$PROJECT_ID/$REPO_NAME/admin:$COMMIT_SHA',
+  'eu.gcr.io/$PROJECT_ID/$REPO_NAME/client:$COMMIT_SHA',
+  'eu.gcr.io/$PROJECT_ID/$REPO_NAME/server:$COMMIT_SHA'
+]
+
+timeout: 1500s
+
+substitutions:
+
+steps:
+
+# NOTE: This first ugly step is an optimization. We execute cancel with
+# the google provided kubectl container instead of taito-cli, because it
+# doesn't need to be pulled before execution -> cancel executes immediately.
+- id: manual-cancel
+  name: 'gcr.io/cloud-builders/kubectl'
+  entrypoint: 'bash'
+  env:
+    - branch_name=$BRANCH_NAME
+    - commit_sha=$COMMIT_SHA
+    - build_id=$BUILD_ID
+    - full_repo_name=$REPO_NAME
+    - image_path=eu.gcr.io/$PROJECT_ID/$REPO_NAME/client:$COMMIT_SHA
+  args:
+  - '-c'
+  - |
+    export taito_env
+    taito_env="$${branch_name}"
+    if [[ "$${taito_env}" == "master" ]]; then
+      taito_env="prod"
+    fi
+    source ./taito-config.sh
+
+    echo "- Get gcloud credentials"
+    gcloud container clusters get-credentials "$${kubectl_name}" \
+      --zone "$${gcloud_zone}"
+    if [[ $$? -gt 0 ]]; then
+      echo "WARNING! Get gcloud credentials failed. Build cancel not possible."
+      # exit 1
+    fi
+
+    echo "- Cancel all previous ongoing builds targetting the same branch"
+    # TODO just in case: filter builds that are newer than this build
+    # --> remeber to implement it also in the taito-cli cancel plugin
+    gcloud beta container builds list --ongoing | \
+      grep "$${full_repo_name}@$${branch_name}" | \
+      grep -v "$${build_id}" | \
+      cut -d ' ' -f 1 | \
+      xargs -L1 gcloud container builds cancel
+
+    # echo "Delete kube credentials to avoid gcloud/kubectl version mismatch"
+    # rm -rf ~/.kube
+
+    echo "- We ignore all fails during cancel (hence the last echo)"
+
+
+# ----------------------- Taito-cli ----------------------------------
+
+# Preparing steps
+
+- id: ci-prepare
+  waitFor: ['-']
+  args: ['ci-prepare:$BRANCH_NAME', 'server', '$COMMIT_SHA', 'eu.gcr.io/$PROJECT_ID/$REPO_NAME']
+  env:
+    - taito_mode=ci
+
+# NOTE: We wait for ci-prepare step since it's the first step that
+# pulls the taito-cli image that is used in all subsequent steps
+
+- id: install
+  args: ['install:$BRANCH_NAME']
+  env:
+    - taito_mode=ci
+
+- id: ci-release-pre
+  waitFor: ['install']
+  args: ['ci-release-pre:$BRANCH_NAME']
+  env:
+    - taito_mode=ci
+
+- id: scan
+  waitFor: ['install']
+  args: ['scan:$BRANCH_NAME']
+  env:
+    - taito_mode=ci
+
+# Build artifacts
+
+- id: docs
+  waitFor: ['install']
+  args: ['docs:$BRANCH_NAME']
+  env:
+    - taito_mode=ci
+
+- id: ci-build-admin
+  waitFor: ['ci-release-pre']
+  args: ['ci-build:$BRANCH_NAME', 'admin', '$COMMIT_SHA', 'eu.gcr.io/$PROJECT_ID/$REPO_NAME']
+  env:
+    - taito_mode=ci
+
+- id: ci-push-admin
+  waitFor: ['ci-build-admin']
+  args: ['ci-push:$BRANCH_NAME', 'admin', '$COMMIT_SHA', 'eu.gcr.io/$PROJECT_ID/$REPO_NAME']
+  env:
+    - taito_mode=ci
+
+- id: ci-build-bot
+  waitFor: ['ci-release-pre']
+  args: ['ci-build:$BRANCH_NAME', 'bot', '$COMMIT_SHA', 'eu.gcr.io/$PROJECT_ID/$REPO_NAME']
+  env:
+    - taito_mode=ci
+
+- id: ci-push-bot
+  waitFor: ['ci-build-bot']
+  args: ['ci-push:$BRANCH_NAME', 'bot', '$COMMIT_SHA', 'eu.gcr.io/$PROJECT_ID/$REPO_NAME']
+  env:
+    - taito_mode=ci
+
+- id: ci-build-client
+  waitFor: ['ci-release-pre']
+  args: ['ci-build:$BRANCH_NAME', 'client', '$COMMIT_SHA', 'eu.gcr.io/$PROJECT_ID/$REPO_NAME']
+  env:
+    - taito_mode=ci
+
+- id: ci-push-client
+  waitFor: ['ci-build-client']
+  args: ['ci-push:$BRANCH_NAME', 'client', '$COMMIT_SHA', 'eu.gcr.io/$PROJECT_ID/$REPO_NAME']
+  env:
+    - taito_mode=ci
+
+- id: ci-build-server
+  waitFor: ['ci-release-pre']
+  args: ['ci-build:$BRANCH_NAME', 'server', '$COMMIT_SHA', 'eu.gcr.io/$PROJECT_ID/$REPO_NAME']
+  env:
+    - taito_mode=ci
+
+- id: ci-push-server
+  waitFor: ['ci-build-server']
+  args: ['ci-push:$BRANCH_NAME', 'server', '$COMMIT_SHA', 'eu.gcr.io/$PROJECT_ID/$REPO_NAME']
+  env:
+    - taito_mode=ci
+
+- id: ci-build-worker
+  waitFor: ['ci-release-pre']
+  args: ['ci-build:$BRANCH_NAME', 'worker', '$COMMIT_SHA', 'eu.gcr.io/$PROJECT_ID/$REPO_NAME']
+  env:
+    - taito_mode=ci
+
+- id: ci-push-worker
+  waitFor: ['ci-build-worker']
+  args: ['ci-push:$BRANCH_NAME', 'worker', '$COMMIT_SHA', 'eu.gcr.io/$PROJECT_ID/$REPO_NAME']
+  env:
+    - taito_mode=ci
+
+# Deploy to target environment
+
+- id: db-deploy
+  args: ['db-deploy:$BRANCH_NAME']
+  env:
+    - taito_mode=ci
+
+- id: ci-deploy
+  args: ['ci-deploy:$BRANCH_NAME', '$COMMIT_SHA']
+  env:
+    - taito_mode=ci
+
+# Run tests against the target environment
+
+- id: ci-wait
+  args: ['ci-wait:$BRANCH_NAME']
+  env:
+    - taito_mode=ci
+
+- id: test
+  waitFor: ['ci-wait']
+  args: ['test:$BRANCH_NAME']
+  env:
+    - taito_mode=ci
+
+- id: ci-verify
+  args: ['ci-verify:$BRANCH_NAME']
+  env:
+    - taito_mode=ci
+
+# Publish and release
+
+- id: ci-publish
+  args: ['ci-publish:$BRANCH_NAME']
+  env:
+    - taito_mode=ci
+
+- id: ci-release-post
+  args: ['ci-release-post:$BRANCH_NAME']
+  env:
+    - taito_mode=ci

@@ -1,0 +1,105 @@
+{
+  "name": "taito-test0",
+  "scripts": {
+    "install-ci": "echo '# No additional dependencies need to be installed in ci mode'",
+    "install-dev": "echo '# Installing all libraries on host for code editor support. TODO how to minimize as --only=dev affects devDepencies also?' && npm run install-all",
+    "install-all": "npm-run-all install-all:admin install-all:bot install-all:client install-all:server install-all:worker",
+    "install-all:admin": "cd admin && npm install && npm run types-install",
+    "install-all:bot": "cd bot && npm install && npm run types-install",
+    "install-all:client": "cd client && npm install && npm run types-install",
+    "install-all:server": "cd server && npm install && npm run types-install",
+    "install-all:worker": "cd worker && npm install && npm run types-install",
+    "taito-init:local:clean": "taito -z init --clean && npm run clean:storage",
+    "clean:storage": "rm -rf ./storage/bucket/*; rm -rf ./storage/.minio.sys/buckets/bucket/*/",
+    "info:local": "taito secrets | grep 'Showing\\|PASSWORD'; echo; echo 'TODO: add local users to package.json (username/password)'",
+    "info:dev": "taito secrets:dev | grep -A 1 'Showing\\|user.'; echo; echo 'TODO: add dev users to package.json (username/password)'",
+    "info:test": "taito secrets:test | grep -A 1 'Showing\\|user.'; echo; echo 'TODO: add test users to package.json (username/password)'",
+    "info:staging": "TODO",
+    "info:prod": "TODO",
+    "lint": "echo Running lint && npm-run-all --parallel lint:admin lint:bot lint:client lint:server lint:worker",
+    "lint:admin": "cd admin && npm run lint",
+    "lint:bot": "cd bot && npm run lint",
+    "lint:client": "cd client && npm run lint",
+    "lint:server": "cd server && npm run lint",
+    "lint:worker": "cd worker && npm run lint",
+    "unit": "npm-run-all --parallel unit:admin unit:bot unit:client unit:server unit:worker",
+    "unit:admin": "taito run: admin -- npm run unit",
+    "unit:bot": "echo TODO unit:bot",
+    "unit:client": "taito run: client -- npm run unit",
+    "unit:server": "taito run: server -- npm run unit",
+    "unit:worker": "echo TODO unit:worker",
+    "test": "npm-run-all --parallel test:admin test:bot test:client test:server test:worker",
+    "test:admin": "taito util-test:${taito_env} admin",
+    "test:bot": "echo TODO test:bot",
+    "test:client": "taito util-test:${taito_env} client",
+    "test:server": "taito util-test:${taito_env} server",
+    "test:worker": "echo TODO test:worker",
+    "analyze": "npm-run-all --parallel analyze:admin analyze:client",
+    "analyze:admin": "cd admin && npm run analyze",
+    "analyze:client": "cd client && npm run analyze",
+    "project-contacts": "cat PROJECT.md | sed -n -e '/^## Contacts.*$/,/^#.*$/{ /^## Contacts.*$/d; /^#.*$/d; p; }'",
+    "docs": "echo TODO: generate docs in package.json",
+    "scan": "echo 'Linting is executed in Dockerfiles during build' && echo 'TODO: execute code analysis here?'",
+    "commit": "echo 'Running commitizen locally' && git-cz",
+    "commitmsg": "echo 'NOTE: Running validate-commit-msg locally' && validate-commit-msg",
+    "precommit": "echo 'SKIP: Skipping linting on commit since we are already continuously linting during development.'",
+    "prepush": "npm-run-all --parallel lint disabled-types disabled-unit",
+    "types": "if [ -f .flowconfig ]; then flow; elif [ -f tsconfig.json ]; then echo TODO run typescript; fi",
+    "disabled-types": "echo flow/typescript check disabled on prepush",
+    "disabled-unit": "echo unit tests disabled on prepush",
+    "release-pre:prod": "semantic-release pre",
+    "release-post:prod": "semantic-release post"
+  },
+  "config": {
+    "commitizen": {
+      "path": "./node_modules/cz-conventional-changelog"
+    },
+    "validate-commit-msg": {
+      "types": [
+        "wip",
+        "feat",
+        "fix",
+        "docs",
+        "style",
+        "refactor",
+        "perf",
+        "test",
+        "build",
+        "ci",
+        "chore",
+        "revert"
+      ],
+      "scope": {
+        "required": false,
+        "allowed": [
+          "*"
+        ],
+        "validate": false,
+        "multiple": false
+      },
+      "warnOnFail": false,
+      "maxSubjectLength": 100,
+      "subjectPattern": ".+",
+      "subjectPatternErrorMsg": "subject does not match subject pattern!",
+      "helpMessage": "",
+      "autoFix": false
+    }
+  },
+  "release": {
+    "getLastRelease": "last-release-git",
+    "debug": false,
+    "verifyConditions": {
+      "path": "./node_modules/semantic-release/src/lib/plugin-noop.js"
+    }
+  },
+  "devDependencies": {
+    "commitizen": "^2.9.6",
+    "cz-conventional-changelog": "^2.0.0",
+    "flow-bin": "^0.69.0",
+    "husky": "^0.14.3",
+    "last-release-git": "0.0.3",
+    "npm-run-all": "^4.0.2",
+    "semantic-release": "^8.1.2",
+    "validate-commit-msg": "^2.14.0"
+  }
+}

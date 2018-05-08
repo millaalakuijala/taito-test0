@@ -1,0 +1,10 @@
+node_modules
+flow-typed/npm
+test/reports
+credentials
+*.log
+.DS_Store
+_build
+_build_git
+build
+*.swp
